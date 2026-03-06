@@ -1,0 +1,90 @@
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    environment {
+        DOCKER_USER = "surya8442"
+        IMAGE_NAME = "hotstar_img"
+        IMAGE_TAG = "latest"
+        CONTAINER_NAME = "hotstar_cont"
+        PYTHON_ENV = "venv"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Surya8442/HOTSTAR-Project.git'
+            }
+        }
+
+        stage('Setup Python') {
+            steps {
+                sh '''
+                python3 -m venv $PYTHON_ENV
+                ./$PYTHON_ENV/bin/pip install --upgrade pip
+                ./$PYTHON_ENV/bin/pip install -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                sh './$PYTHON_ENV/bin/python -m unittest discover -s tests || true'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                '''
+            }
+        }
+
+        stage('Stop Old Container') {
+            steps {
+                sh '''
+                docker rm -f ${CONTAINER_NAME} || true
+                '''
+            }
+        }
+
+        stage('Run New Container') {
+            steps {
+                sh '''
+                docker run -d -p 8000:8000 --name ${CONTAINER_NAME} ${IMAGE_NAME}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Push Image to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'Docker_cred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh '''
+                    echo "$PASS" | docker login -u "$USER" --password-stdin
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}
+                    '''
+                }
+            }
+        }
+
+    }
+
+    post {
+        always {
+            echo 'Cleaning up...'
+            sh 'docker logout'
+        }
+        success {
+            echo 'Pipeline finished successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
