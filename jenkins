@@ -7,8 +7,6 @@ pipeline {
 
     environment {
         DOCKER_USER = "surya8442"
-        IMAGE_NAME = "instagram_img"
-        IMAGE_TAG = "latest"
         CONTAINER_NAME = "instagram_cont"
         PYTHON_ENV = "venv"
     }
@@ -39,7 +37,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .'
+                sh 'docker build -t instagram_img:latest .'
             }
         }
 
